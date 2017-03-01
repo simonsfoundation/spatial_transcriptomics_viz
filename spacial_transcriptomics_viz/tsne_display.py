@@ -17,7 +17,7 @@ TSNE_y = 'TSNE_y'
 INDICATOR = 'INDICATOR'
 NAME = "NAME"
 
-SLIDE_SIZE = 40
+#SLIDE_SIZE = 40
 TSNE_RADIUS = 11
 BACKGROUND_COLOR = "#FFFFDD"
 
@@ -69,6 +69,8 @@ class Data(object):
         self.slide_to_data = slide_to_data
         self.indicator_to_color = {ind: color(i) for (i, ind) in enumerate(indicator_to_data.keys())}
         self.slides = list(sorted(slide_to_data.keys()))
+        self.slide_height = max(d[SLIDE_y] for d in data)
+        self.slide_width = max(d[SLIDE_x] for d in data)
 
     def data_names(self):
         return [d[NAME] for d in self.data_list]
@@ -78,25 +80,26 @@ class Data(object):
 
 class Slide(object):
 
-    radius = SLIDE_SIZE * 0.01
-    selected_radius = radius * 2
+    #radius = SLIDE_SIZE * 0.01
+    #selected_radius = radius * 2
     xy = None  # slide location assigned by container
     
     def __init__(self, name, data, drawing=None):
         self.name = name
         self.data = data
+        self.radius = self.data.slide_width * 0.01
         self.drawing = drawing
 
-    def draw_on(self, dx, dy, drawing=None, selected=None, indicator=None):
+    def draw_on(self, dx, dy, data, drawing=None, selected=None, indicator=None):
         if drawing is None:
             drawing = self.drawing
         assert drawing is not None
         #drawing.empty()
-        drawing.rect(None, dx, dy, SLIDE_SIZE, SLIDE_SIZE, BACKGROUND_COLOR)
+        drawing.rect(None, dx, dy, data.slide_width, data.slide_height, BACKGROUND_COLOR)
         slide_name = self.name
-        data = self.data.slide_to_data[slide_name]
+        data_list = self.data.slide_to_data[slide_name]
         indicator_to_color = self.data.indicator_to_color
-        for d in data:
+        for d in data_list:
             if d[SLIDE] == slide_name:
                 name = d[NAME]
                 ind = d[INDICATOR]
@@ -114,7 +117,7 @@ class Slide(object):
                 x = d["SLIDE_x"] + dx
                 y = d["SLIDE_y"] + dy
                 drawing.circle(name, x, y, radius, color)
-        drawing.text(None, dx, dy + SLIDE_SIZE, slide_name)
+        drawing.text(None, dx, dy + data.slide_height, slide_name)
         drawing.flush()
 
 class TSNE(object):
@@ -125,7 +128,7 @@ class TSNE(object):
         self.data = data
         self.drawing = drawing
 
-    def draw_on(self, dx=0, dy=0, drawing=None, indicator=None, slide=None, selected=None):
+    def draw_on(self, dx, dy, data, drawing=None, indicator=None, slide=None, selected=None):
         if drawing is None:
             drawing = self.drawing
         assert drawing is not None
@@ -168,7 +171,8 @@ class Slides(object):
     big_width = small_width * 6
     row_size = 8
     
-    def __init__(self, data=None):
+    def __init__(self, data=None, slide_columns=8):
+        self.row_size = slide_columns
         if data is None:
             data = Data()
         self.data = data
@@ -176,13 +180,16 @@ class Slides(object):
         slide_displays = []
         slide_name_to_controller = {}
         slide_controllers = []
-        slide_columns = 8
-        slide_rows = int(len(slides) / slide_columns) + 1
+        slide_rows = int(len(slides) / slide_columns)
+        if slide_rows * slide_columns < len(slides):
+            slide_rows += 1
         self.slide_margin = margin = 5
-        row_size = margin + slide_rows * (SLIDE_SIZE + margin)
-        col_size = margin + slide_columns * (SLIDE_SIZE + margin)
+        row_size = 2*margin + slide_rows * (data.slide_height + margin)
+        col_size = 2*margin + (slide_columns) * (data.slide_width + margin)
         slides_width = 2 * self.big_width
         #slide_drawing = cartesian_svg.doodle(-1, -1, col_size+1, row_size+1, slides_width, margin=2)
+        #print "rows, cols", slide_rows, slide_columns
+        #print "slides dimensions", len(slides), col_size, row_size, "html width", slides_width
         slide_drawing = canvas_doodle(-1, -1, col_size+1, row_size+1, slides_width, margin=2)
         self.slide_drawing = slide_drawing
         #slide_drawing.enable_events("click", self.slide_drawing_click)
@@ -211,7 +218,7 @@ class Slides(object):
         #tsne_events = "click"
         #print "enabling tsne events", tsne_events
         #tsne_drawing.enable_events(tsne_events, self.tsne_event_callback)
-        big_slide_drawing = cartesian_svg.doodle(-1, -1, SLIDE_SIZE+1, SLIDE_SIZE+1, self.big_width, margin=4)
+        big_slide_drawing = cartesian_svg.doodle(-1, -1, data.slide_width+1, data.slide_height+1, self.big_width, margin=4)
         self.big_slide_drawing = big_slide_drawing
         # make dialog
         w = js_proxy.ProxyWidget()
@@ -251,7 +258,7 @@ class Slides(object):
         #print "slide click at", (x,y), info.get("type")
         for controller in self.slide_controllers:
             (sx, sy) = controller.xy
-            if x > sx and x < sx + SLIDE_SIZE and y > sy and y < sy + SLIDE_SIZE:
+            if x > sx and x < sx + self.data.slide_width and y > sy and y < sy + self.data.slide_height:
                 self.chosen_slide = controller.name
                 self.highlight_slide = controller.name
                 self.draw()
@@ -310,24 +317,30 @@ class Slides(object):
         self.draw()
 
     def draw(self):
-        self.tsne_controller.draw_on(slide=self.highlight_slide, selected=self.selected_data)
         self.slide_drawing.empty()
+        self.tsne_drawing.empty()
+        self.slide_drawing.flush()
+        self.tsne_drawing.flush()
+        #return
+        self.tsne_controller.draw_on(0, 0, slide=self.highlight_slide, data=self.data, selected=self.selected_data)
         margin = self.slide_margin
-        offset = margin + SLIDE_SIZE
+        #offset = margin + SLIDE_SIZE
+        xoffset = margin + self.data.slide_width
+        yoffset = margin + self.data.slide_height
         #dy = margin
-        dy = offset * (len(self.controller_rows) - 1) + margin
+        dy = yoffset * (len(self.controller_rows) - 1) + margin
         for row in self.controller_rows:
             dx = margin
             for controller in row:
-                controller.draw_on(dx, dy, indicator=self.chosen_indicator, selected=self.selected_data)
+                controller.draw_on(dx, dy, self.data, indicator=self.chosen_indicator, selected=self.selected_data)
                 controller.xy = (dx, dy)
-                dx += offset
+                dx += xoffset
                 #break
-            dy -= offset
+            dy -= yoffset
         slide_name = self.chosen_slide
         controller = self.slide_name_to_controller[slide_name]
         self.big_slide_drawing.empty()
-        controller.draw_on(0,0,self.big_slide_drawing, selected=self.selected_data)
+        controller.draw_on(0,0,self.data,self.big_slide_drawing, selected=self.selected_data)
         if not self.events_enabled:
             self.enable_events()
         self.reset_bookkeeping()
