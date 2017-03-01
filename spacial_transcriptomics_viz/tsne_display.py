@@ -239,7 +239,7 @@ class Slides(object):
         self.events_enabled = True
         tsne_events = "click mousedown mouseup mousemove mouseout"
         #tsne_events = "click"
-        print "enabling tsne events", tsne_events
+        #print "enabling tsne events", tsne_events
         self.tsne_drawing.enable_events(tsne_events, self.tsne_event_callback)
         self.tsne_drawing.flush()
         self.slide_drawing.flush()
@@ -270,7 +270,7 @@ class Slides(object):
             if ty == "mouseout":
                 self.lasso_points = []
             elif ty == "mousedown":
-                print "lasso_start", point
+                #print "lasso_start", point
                 self.lasso_points = [point]
             elif ty == "mousemove":
                 addit = True
@@ -284,7 +284,7 @@ class Slides(object):
                     if addit:
                         lasso.append(point)
             elif ty == "mouseup":
-                print "lasso complete"
+                #print "lasso complete"
                 if len(lasso) > 2:
                     (px, py) = lasso[0]
                     (lx, ly) = lasso[-1]
@@ -302,7 +302,8 @@ class Slides(object):
                 #print lasso
                 self.lasso_points = []
         except Exception as e:
-            print "exception in tsne event", e
+            #print "exception in tsne event", e
+            raise
 
     def show(self):
         display(self.assembly)
