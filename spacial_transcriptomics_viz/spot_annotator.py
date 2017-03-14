@@ -44,19 +44,19 @@ LABELS = [
 ]
 
 COLORS = {
-    Vent_Med_White: '#7722dd',
+    Vent_Med_White: '#aaaa66',
     Vent_Horn: '#ee45ba',
-    Vent_Lat_White: '#656897',
-    Med_Grey: '#dc8b74',
-    Dors_Horn: '#53ae51',
-    Dors_Edge: '#cad12e',
-    Med_Lat_White: '#41f40b',
-    Vent_Edge: '#b916e8',
-    Med_Edge: '#3039c5',
-    Dors_Med_White: '#a75ca2',
-    Cent_Can: '#1e7f7f',
-    Lat_Edge: '#95a25c',
-    Undefined: '#0cc539',
+    Vent_Lat_White: '#66aaaa',
+    Med_Grey: '#997744',
+    Dors_Horn: '#447799',
+    Dors_Edge: '#774499',
+    Med_Lat_White: '#aa66aa',
+    Vent_Edge: '#994477',
+    Med_Edge: '#997744',
+    Dors_Med_White: '#aaddee',
+    Cent_Can: '#6666ff',
+    Lat_Edge: '#ff6666',
+    Undefined: '#dddddd',
 }
 
 def add_image(svg_canvas, image_href, x=0, y=0, width=None, height=None, name="background",
@@ -107,8 +107,10 @@ class SpotAnnotator(object):
         info = self.info_area = widgets.Textarea(description="status")
         filename = self.file_name_text = widgets.Text(value=self.annotation_path)
         savebutton = self.save_button = widgets.Button(description="save")
-        savebutton.onclick = self.save_click
-        file_save = widgets.HBox(children=[filename, savebutton])
+        savebutton.on_click(self.save_click)
+        restorebutton = self.restore_button = widgets.Button(description="restore")
+        restorebutton.on_click(self.restore_click)
+        file_save = widgets.HBox(children=[filename, savebutton, restorebutton])
         work_area = widgets.HBox(children=[sd.target, ls, im_detail])
         self.assembly = widgets.VBox(children=[work_area, file_save, info])
         #self.assembly = widgets.HBox(children=[ls])
@@ -116,11 +118,24 @@ class SpotAnnotator(object):
         self.configure_label_selector()
         self.configure_image_detail()
         self.label_selection.flush()
-        self.draw_spots()
+        if os.path.exists(self.annotation_path):
+            self.restore_click()
+        else:
+            self.draw_spots()
         #(width, height) = self.img_wh
         #(width, height) = detail.project(width, height)
         #add_image(detail.target, self.image_href, opacity=1.0, width=abs(width), height=abs(height))
         #self.label_handler(Undefined, None)
+
+    def restore_click(self, *args):
+        filename = self.file_name_text.value
+        self.info_area.value = "restoring from " + filename
+        result = self.restore_annotations(filename)
+        if result is True:
+            self.draw_spots()
+            self.info_area.value = "restored from " + filename
+        else:
+            self.info_area.value = "failed to restore " + repr((filename, result))
 
     def save_click(self, *args):
         filename = self.file_name_text.value
@@ -133,6 +148,7 @@ class SpotAnnotator(object):
 
     def draw_spots(self, image=True, dots=True):
         drawing = self.spot_display
+        drawing.empty()
         coords = self.coordinates
         labels = self.labels
         radius = self.radius
@@ -150,7 +166,7 @@ class SpotAnnotator(object):
                 ys.append(y)
                 radii.append(radius)
                 clrs.append(clr)
-            drawing.circles(names, xs, ys, radii, clr)
+            drawing.circles(names, xs, ys, radii, clrs)
             #drawing.flush()
         if image:
             import time
@@ -159,7 +175,7 @@ class SpotAnnotator(object):
             #drawing.flush()
         drawing.enable_events("click", self.spot_callback)
         self.info_area.value = "spots drawn " + repr(len(coords))
-        print "drew", len(coords), "spots"
+        #print "drew", len(coords), "spots"
         drawing.flush()
 
     def spot_callback(self, info):
@@ -178,8 +194,9 @@ class SpotAnnotator(object):
                 chosen_index = index
                 chosen_xy = (x, y)
                 #print "chose", index, (x,y), (px, py)
+        label = None
         if chosen_index is not None:
-            self.set_label(chosen_index)
+            label = self.set_label(chosen_index)
             #self.set_detail(chosen_xy)
             detail = self.focus_image_detail(chosen_xy)
             self.info_area.value = "clicked %s: %s"  % (chosen_index, chosen_xy)
@@ -197,35 +214,22 @@ class SpotAnnotator(object):
         display.delete("reference")
         atts = {"opacity": 0.1}
         y = y - h
-        print "highlight", x, y, w, h
+        #print "highlight", x, y, w, h
         display.rect("reference", x, y, w, h, "red", other_attributes=atts)
         display.flush()
-
-    """def set_detail(self, xy):
-        (x, y) = xy
-        #detail = self.detail_display
-        drawing = self.spot_display
-        llx = x - self.radius
-        lly = y - self.radius
-        urx = llx + 2 * self.radius
-        ury = lly + 2 * self.radius
-        (llx_s, lly_s) = drawing.project(llx, lly)
-        (urx_s, ury_s) = drawing.project(urx, ury)
-        self.focus_image_detail(x, y)
-        #detail.target.set_view_box(min(llx_s, urx_s), min(lly_s, ury_s), abs(llx_s-urx_s), abs(lly_s-ury_s))
-        #print "detail view box", detail.target.viewBox"""
     
     def set_label(self, index):
         name = self.circle_name(index)
         label = self.selected_label
         if label is None:
             self.info_area.value = "no selected label " + repr(index)
-            return
+            return None
         self.labels[index] = label
         color = COLORS[label]
         self.spot_display.change(name, fill=color)
         self.info_area.value = "selected %s for %s" % (color, index)
-        #print "set_label", index, name, label, color
+        return label
+        print "set_label", index, name, label, color
 
     def adjust(self, x, y):
         (minx, miny) = self.mins
@@ -269,7 +273,7 @@ class SpotAnnotator(object):
                 .appendTo(elt.top_div)))
         return w
 
-    detail_size = 500  # TEMP!
+    detail_size = 500
     detail_side = 500
 
     def configure_image_detail(self):
@@ -362,11 +366,13 @@ class SpotAnnotator(object):
         self.coordinates = coordinates
         self.labels = labels
 
+    fixed_headers = ["Slide", "Array", "xPos", "yPos"]
+
     def dump_annotations(self, to_path=None):
         if to_path is None:
             to_path = self.annotation_path
         f = open(to_path, "w")
-        headers = ["Slide", "Array", "xPos", "yPos"] + LABELS
+        headers = self.fixed_headers + LABELS
         f.write(("\t".join(headers) + "\n"))
         slide_array = [self.slide, self.array_name]
         for (i, xy) in enumerate(self.coordinates):
@@ -378,3 +384,42 @@ class SpotAnnotator(object):
             srow = map(str, row)
             f.write(("\t".join(srow))+"\n")
         f.close()
+
+    def restore_annotations(self, from_path=None, epsilon=1e-4):
+        if not os.path.isfile(from_path):
+            return "No such file " + repr(from_path)
+        f = open(from_path)
+        headers = f.readline().strip().split("\t")
+        if headers[:4] != self.fixed_headers:
+            return "Fixed headers do not match " + repr((from_path, headers, self.fixed_headers))
+        label_order = headers[4:]
+        if not set(label_order).issubset(set(LABELS)):
+            return "Unknown labels " + repr((set(label_order) - set(LABELS), from_path))
+        line = f.readline().strip()
+        while line:
+            items = line.split("\t")
+            [slide, array, xps, yps] = items[:4]
+            xp = float(xps)
+            yp = float(yps)
+            if slide == self.slide and array == self.array_name:
+                index = None
+                for (i, (x, y)) in enumerate(self.coordinates):
+                    n = norm([(x - xp), (y - yp)])
+                    if n < epsilon:
+                        if index is not None:
+                            return "ambiguous position" + repr((i, x, y, from_path))
+                        index = i
+                label = None
+                try:
+                    indicators = map(int, items[4:])
+                except ValueError:
+                    return "bad indicator line " + repr(items[4:])
+                label = None
+                for (lindex, indicator) in enumerate(indicators):
+                    if indicator != 0:
+                        if label is not None:
+                            return "position has more than one label " + (i, x, y, label_order[lindex], label)
+                        label = label_order[lindex]
+                self.labels[index] = label
+            line = f.readline().strip()
+        return True  # success
