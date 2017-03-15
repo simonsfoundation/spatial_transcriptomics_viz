@@ -218,7 +218,8 @@ class Slides(object):
         #tsne_events = "click"
         #print "enabling tsne events", tsne_events
         #tsne_drawing.enable_events(tsne_events, self.tsne_event_callback)
-        big_slide_drawing = cartesian_svg.doodle(-1, -1, data.slide_width+1, data.slide_height+1, self.big_width, margin=4)
+        #big_slide_drawing = cartesian_svg.doodle(-1, -1, data.slide_width+1, data.slide_height+1, self.big_width, margin=4)
+        big_slide_drawing = canvas_doodle(-1, -1, data.slide_width+1, data.slide_height+1, self.big_width, margin=4)
         self.big_slide_drawing = big_slide_drawing
         # make dialog
         w = js_proxy.ProxyWidget()
@@ -227,7 +228,7 @@ class Slides(object):
         w(e.dialog("close"))
         w.flush()
         self.dialog = w
-        big_assembly = widgets.HBox(children=[tsne_drawing.target.widget, big_slide_drawing.target])
+        big_assembly = widgets.HBox(children=[tsne_drawing.target.widget, big_slide_drawing.target.widget])
         self.assembly = widgets.VBox(children=[big_assembly, slide_drawing.target.widget, self.dialog])
         self.tsne_controller = TSNE(data, tsne_drawing)
         self.slide_controller_rows = slide_controllers

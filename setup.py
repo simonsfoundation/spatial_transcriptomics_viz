@@ -8,15 +8,15 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "spacial_transcriptomics_viz",
+    name = "spatial_transcriptomics_viz",
     version = "0.0.1",
     author = "Aaron Watters",
     author_email = "awatters@simonsfoundation.org",
-    description = ("visualization aids for spacial transcriptomics."),
+    description = ("visualization aids for spatial transcriptomics."),
     license = "BSD",
     keywords = "jupyter widget genomics",
-    url = "http://packages.python.org/jp_gene_viz",
-    packages=['spacial_transcriptomics_viz'],
+    url = "http://packages.python.org/spatial_transcriptomics_viz",
+    packages=['spatial_transcriptomics_viz'],
     #package_data={'jp_gene_viz': ['*.js']},
     long_description=read('README.md'),
     classifiers=[
