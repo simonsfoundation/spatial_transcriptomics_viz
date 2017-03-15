@@ -79,6 +79,7 @@ def add_image(svg_canvas, image_href, x=0, y=0, width=None, height=None, name="b
 class SpotAnnotator(object):
 
     selected_label = None
+    selected_index = None
 
     def __init__(self, image_href, tsv_data_path, annotation_path=None, 
         mins=(2,2), maxes=(32,34), radius=0.3):
@@ -205,6 +206,7 @@ class SpotAnnotator(object):
             detail = self.focus_image_detail((px,py))
             self.info_area.value = "no match for click " + repr((px, py))
         self.info_area.value = "clicked %s: %s %s"  % (chosen_index, chosen_xy, detail)
+        self.selected_index = chosen_index
         self.highlight_detail(detail)
 
     def highlight_detail(self, detail):
@@ -346,6 +348,8 @@ class SpotAnnotator(object):
             .css("background-color", COLORS[label])
             .css("color", "white"))
         w.flush()
+        if self.selected_index is not None:
+            self.set_label(self.selected_index)
 
     def get_coordinates(self):
         path = self.tsv_data_path
