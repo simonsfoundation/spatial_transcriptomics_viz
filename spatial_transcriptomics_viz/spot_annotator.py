@@ -7,6 +7,7 @@ from jp_gene_viz import js_proxy
 import contourist.lasso
 import os
 from PIL import Image
+import shutil
 
 canvas.load_javascript_support()
 
@@ -81,14 +82,27 @@ class SpotAnnotator(object):
     selected_label = None
     selected_index = None
 
-    def __init__(self, image_href, tsv_data_path, annotation_path=None, 
-        mins=(2,2), maxes=(32,34), radius=0.3):
+    def __init__(self, tsv_data_path, image_path=None, image_href=None, annotation_path=None, 
+        mins=(2,2), maxes=(32,34), radius=0.3, scratchdir="image_copies"):
         self.radius = radius
         self.mins = np.array(mins, dtype=np.float)
         self.maxes = np.array(maxes, dtype=np.float)
         self.offset = self.maxes - self.mins
         assert os.path.exists(tsv_data_path)
-        assert os.path.exists(image_href)
+        if image_href is not None:
+            assert image_path is None, "Only provide one of image_path or image_href, please. " + repr((image_path, image_href))
+            image_path = image_href
+        else:
+            assert image_path is not None, "Image path or href is required."
+            assert os.path.isfile(image_path), "No such file " + repr(image_path)
+            # copy the image to scratch area
+            if not os.path.isdir(scratchdir):
+                os.mkdir(scratchdir)
+            image_filename = os.path.split(image_path)[-1]
+            image_href = scratchdir + "/" + image_filename
+            shutil.copyfile(image_path, image_href)
+            print(image_path + " copied to " + image_href)
+        assert os.path.exists(image_href), "image not found " + repr(image_href)
         self.image_href = image_href
         self.tsv_data_path = tsv_data_path
         if annotation_path is None:
