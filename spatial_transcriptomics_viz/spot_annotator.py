@@ -8,6 +8,7 @@ import contourist.lasso
 import os
 from PIL import Image
 import shutil
+from threading import Timer
 
 canvas.load_javascript_support()
 
@@ -82,28 +83,25 @@ class SpotAnnotator(object):
     selected_label = None
     selected_index = None
 
-    def __init__(self, tsv_data_path, image_path=None, image_href=None, annotation_path=None, 
-        mins=(2,2), maxes=(32,34), radius=0.3, scratchdir="image_copies"):
-        self.radius = radius
-        self.mins = np.array(mins, dtype=np.float)
-        self.maxes = np.array(maxes, dtype=np.float)
-        self.offset = self.maxes - self.mins
+    def __init__(self, tsv_data_path, image_path=None, image_href=None, annotation_path=None, spots_path=None,
+        mins=(1,1), maxes=None, radius=0.3, scratchdir="image_copies"):
+        #self.radius = radius
+        #self.mins = np.array(mins, dtype=np.float)
+        #self.maxes = np.array(maxes, dtype=np.float)
+        #self.offset = self.maxes - self.mins
         assert os.path.exists(tsv_data_path)
+        spots_href = None
         if image_href is not None:
             assert image_path is None, "Only provide one of image_path or image_href, please. " + repr((image_path, image_href))
             image_path = image_href
         else:
             assert image_path is not None, "Image path or href is required."
-            assert os.path.isfile(image_path), "No such file " + repr(image_path)
-            # copy the image to scratch area
-            if not os.path.isdir(scratchdir):
-                os.mkdir(scratchdir)
-            image_filename = os.path.split(image_path)[-1]
-            image_href = scratchdir + "/" + image_filename
-            shutil.copyfile(image_path, image_href)
-            print(image_path + " copied to " + image_href)
+            image_href = self.copy_image(image_path, scratchdir)
+            if spots_path is not None:
+                spots_href = self.copy_image(spots_path, scratchdir)
         assert os.path.exists(image_href), "image not found " + repr(image_href)
         self.image_href = image_href
+        self.spots_href = spots_href
         self.tsv_data_path = tsv_data_path
         if annotation_path is None:
             annotation_path = tsv_data_path + ".annotations.tsv"
@@ -112,6 +110,25 @@ class SpotAnnotator(object):
         # get image dimensions
         im = Image.open(image_href)
         self.image_size = np.array(im.size)
+        self.mins = np.array(mins, dtype=np.float)
+        if maxes is None:
+            spot_to_pixels = self.image_size[0] * 194.0 / 6200.0
+            self.maxes = self.mins + (self.image_size / spot_to_pixels)
+        else:
+            self.maxes = np.array(maxes, dtype=np.float)
+        self.offset = self.maxes - self.mins
+        self.radius = radius
+
+    def copy_image(self, image_path, scratchdir):
+        assert os.path.isfile(image_path), "No such file " + repr(image_path)
+        # copy the image to scratch area
+        if not os.path.isdir(scratchdir):
+            os.mkdir(scratchdir)
+        image_filename = os.path.split(image_path)[-1]
+        image_href = scratchdir + "/" + image_filename
+        shutil.copyfile(image_path, image_href)
+        print(image_path + " copied to " + image_href)
+        return image_href
 
     def show(self):
         ls = self.label_selection = self.label_selector()
@@ -125,7 +142,12 @@ class SpotAnnotator(object):
         savebutton.on_click(self.save_click)
         restorebutton = self.restore_button = widgets.Button(description="restore")
         restorebutton.on_click(self.restore_click)
-        file_save = widgets.HBox(children=[filename, savebutton, restorebutton])
+        file_save_widgets = [filename, savebutton, restorebutton]
+        if self.spots_href is not None:
+            spots_checkbox = self.spots_checkbox = widgets.Checkbox(description="spots")
+            file_save_widgets.append(spots_checkbox)
+            spots_checkbox.on_trait_change(self.redraw, "value")
+        file_save = widgets.HBox(children=file_save_widgets)
         work_area = widgets.HBox(children=[sd.target, ls, im_detail])
         self.assembly = widgets.VBox(children=[work_area, file_save, info])
         #self.assembly = widgets.HBox(children=[ls])
@@ -151,6 +173,10 @@ class SpotAnnotator(object):
             self.info_area.value = "restored from " + filename
         else:
             self.info_area.value = "failed to restore " + repr((filename, result))
+
+    def redraw(self, *args):
+        t = Timer(0.1, self.draw_spots)
+        t.start()
 
     def save_click(self, *args):
         filename = self.file_name_text.value
@@ -187,7 +213,8 @@ class SpotAnnotator(object):
             import time
             #time.sleep(0.2)
             self.img_wh = add_image(drawing.target, self.image_href, opacity=0.5)
-            #drawing.flush()
+        if self.spots_href is not None and self.spots_checkbox.value:
+            add_image(drawing.target, self.spots_href, opacity=0.5)
         drawing.enable_events("click", self.spot_callback)
         self.info_area.value = "spots drawn " + repr(len(coords))
         #print "drew", len(coords), "spots"
@@ -306,6 +333,10 @@ class SpotAnnotator(object):
         w(elt._set("detail_image", jQuery("<img/>", {"src": self.image_href})))
         w(elt.detail_image.hide())
         w(elt.append(elt.detail_image))
+        if self.spots_href:
+            w(elt._set("spots_image", jQuery("<img/>", {"src": self.spots_href})))
+            w(elt.spots_image.hide())
+            w(elt.append(elt.spots_image))
         w.flush()
 
     def focus_image_detail(self, xy):
@@ -334,7 +365,7 @@ class SpotAnnotator(object):
         sw = sh = size
         dx = dy = 0
         dw = dh = self.detail_side
-        w(w.function(["element"], "debugger;")(elt))
+        #w(w.function(["element"], "debugger;")(elt))
         #print "detail_image", sx, sy, sw, sh, dx, dy, dw, dh
         w(elt.ctx.drawImage(elt.detail_image[0], sx, sy, sw, sh, dx, dy, dw, dh))
         cx = cy = size * 0.5
@@ -342,6 +373,10 @@ class SpotAnnotator(object):
         w(elt.ctx.beginPath())
         w(elt.ctx.arc(cx, cy, radius, 0, 6.28))
         w(elt.ctx.stroke())
+        if self.spots_href:
+            w(elt.ctx._set("globalAlpha", 0.1))
+            w(elt.ctx.drawImage(elt.spots_image[0], sx, sy, sw, sh, dx, dy, dw, dh))
+            w(elt.ctx._set("globalAlpha", 1.0))
         w.flush()
         corner = size_shift + self.mins
         dimensions = size * image_to_canvas
