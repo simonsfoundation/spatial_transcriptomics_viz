@@ -4,6 +4,8 @@ from jp_svg_canvas import canvas, cartesian_svg
 from jp_gene_viz import proxy_html5_canvas
 from jp_gene_viz import js_proxy
 import contourist.lasso
+from threading import Timer
+
 canvas.load_javascript_support()
 
 import ipywidgets as widgets
@@ -262,8 +264,14 @@ class Slides(object):
             if x > sx and x < sx + self.data.slide_width and y > sy and y < sy + self.data.slide_height:
                 self.chosen_slide = controller.name
                 self.highlight_slide = controller.name
-                self.draw()
+                self.draw_later()
                 return
+
+    def draw_later(self):
+        "Draw after delay in another thread to prevent callback handshake delays."
+        #print "delayed draw"
+        t = Timer(0.1, self.draw)
+        t.start()
 
     def tsne_event_callback(self, info):
         try:
@@ -306,7 +314,7 @@ class Slides(object):
                     selected = set(names[i] for i in inside)
                     #print "selected", selected
                     self.selected_data = selected
-                    self.draw()
+                    self.draw_later()
                 #print lasso
                 self.lasso_points = []
         except Exception as e:
