@@ -368,7 +368,7 @@ class SpotAnnotator(object):
         #w(w.function(["element"], "debugger;")(elt))
         #print "detail_image", sx, sy, sw, sh, dx, dy, dw, dh
         w(elt.ctx.drawImage(elt.detail_image[0], sx, sy, sw, sh, dx, dy, dw, dh))
-        cx = cy = size * 0.5
+        cx = cy = self.detail_side * 0.5
         radius = self.radius * canvas_to_image[0]
         w(elt.ctx.beginPath())
         w(elt.ctx.arc(cx, cy, radius, 0, 6.28))
