@@ -29,7 +29,7 @@ Cent_Can = 'Cent_Can'
 Lat_Edge = 'Lat_Edge'
 Undefined = 'Undefined'
 
-LABELS = [
+LABELS = sorted([
     Vent_Med_White,
     Vent_Horn,
     Vent_Lat_White,
@@ -43,7 +43,7 @@ LABELS = [
     Cent_Can,
     Lat_Edge,
     Undefined,
-]
+])
 
 COLORS = {
     Vent_Med_White: '#aaaa66',
@@ -60,6 +60,62 @@ COLORS = {
     Lat_Edge: '#ff6666',
     Undefined: '#dddddd',
 }
+
+ARROWS = [LEFT, UP, RIGHT, DOWN] = "LEFT UP RIGHT DOWN".split()
+
+NAME_TO_ARROW_KEY_NUMBER = {
+    LEFT: 37,
+    UP: 38,
+    RIGHT: 39,
+    DOWN: 40,
+}
+NAME_TO_KEY_NUMBER = {}
+LABEL_KEY_0 = ord('a')
+for (index, label) in enumerate(LABELS):
+    NAME_TO_KEY_NUMBER[label] = LABEL_KEY_0 + index
+
+KEY_HANDLER_TEMPLATE = """function(event) {
+        switch (event.which) {
+            %(cases)s
+
+            default: return; // allow defaults for other keys.
+        }
+        event.preventDefault();  // disallow defaults for handled keys
+    };
+"""
+
+def key_handler(dictionary):
+    cases = key_binding_cases(dictionary)
+    return KEY_HANDLER_TEMPLATE % {"cases": cases}
+
+KEY_BINDING_TEMPLATE = """
+    // arguments: element, proxy_callback
+    debugger;
+    var keypress_handler = %(keypress_handler)s
+    var keydown_handler = %(keydown_handler)s
+    element.keydown(keydown_handler);
+    element.keypress(keypress_handler);
+"""
+
+def key_binding_cases(dictionary):
+    cases = []
+    for (name, number) in sorted(dictionary.items()):
+        case = "case %s: proxy_callback(%s); break;" % (number, repr(str(name)))
+        cases.append(case)
+    return "\n            ".join(cases)
+
+def add_key_bindings_to_parent(w, callback, identifier=None):
+    elt = w.element()
+    parent = elt.parent();
+    proxy_callback = w.callback(callback, identifier)
+    D = {}
+    D["keypress_handler"] = key_handler(NAME_TO_KEY_NUMBER)
+    D["keydown_handler"] = key_handler(NAME_TO_ARROW_KEY_NUMBER)
+    key_binding_fn_body = KEY_BINDING_TEMPLATE % D
+    anon_fn = w.function(["element", "proxy_callback"], key_binding_fn_body)
+    #w(anon_fn(elt, proxy_callback))
+    w(anon_fn(parent, proxy_callback))
+    w(parent.attr('tabindex', 0))
 
 def add_image(svg_canvas, image_href, x=0, y=0, width=None, height=None, name="background",
         opacity=1.0):
@@ -154,6 +210,7 @@ class SpotAnnotator(object):
         display(self.assembly)
         self.configure_label_selector()
         self.configure_image_detail()
+        self.add_key_bindings()
         self.label_selection.flush()
         if os.path.exists(self.annotation_path):
             self.restore_click()
@@ -220,33 +277,59 @@ class SpotAnnotator(object):
         #print "drew", len(coords), "spots"
         drawing.flush()
 
-    def spot_callback(self, info):
+    last_xy = None
+
+    def spot_callback(self, info, direction=None, epsilon=0.2):
         [px, py] = info["point"]
         display = self.spot_display
         display.delete("click_circle")
-        atts = {"opacity": 0.3}
-        display.circle("click_circle", px, py, self.radius, "black", other_attributes=atts)
+        atts = {"opacity": 0.1}
+        if direction is None:
+            display.circle("click_circle", px, py, self.radius, "black", other_attributes=atts)
         chosen_index = chosen_xy = None
         radius = self.radius
         coords = self.coordinates
+        last_x = last_y = None
+        if self.last_xy is not None:
+            #print "last_xy", self.last_xy
+            (last_x, last_y) = self.last_xy
+        min_dist = None
         for (index, (x,y)) in enumerate(coords):
             (x,y) = self.adjust(x,y)
-            l1dist = max([abs(x-px), abs(y-py)])
-            if l1dist < 2 * radius:
+            if last_x is not None and direction is not None:
+                if direction == UP and last_y + epsilon >= y:
+                    continue
+                elif direction == DOWN and last_y - epsilon <= y:
+                    continue
+                elif direction == LEFT and last_x - epsilon <= x:
+                    continue
+                elif direction == RIGHT and last_x + epsilon >= x:
+                    continue
+            #l1dist = max([abs(x-px), abs(y-py)])
+            l1dist = abs(x-px) + abs(y-py)
+            if direction is None and l1dist > 2 * radius:
+                continue
+            if min_dist is None or min_dist > l1dist:
+                min_dist = l1dist
                 chosen_index = index
                 chosen_xy = (x, y)
-                #print "chose", index, (x,y), (px, py)
+                #print "chose", index, (x,y), (px, py), (last_x, last_y), repr(direction)
         label = None
         if chosen_index is not None:
             label = self.set_label(chosen_index)
             #self.set_detail(chosen_xy)
             detail = self.focus_image_detail(chosen_xy)
-            self.info_area.value = "clicked %s: %s"  % (chosen_index, chosen_xy)
+            self.last_xy = chosen_xy
+            #self.info_area.value = "clicked %s: %s"  % (chosen_index, map(int, chosen_xy))
+            (px, py) = chosen_xy
+            if direction is not None:
+                display.circle("click_circle", px, py, self.radius, "black", other_attributes=atts)
         else:
             chosen_xy = (px, py)
+            self.last_xy = chosen_xy
             detail = self.focus_image_detail((px,py))
             self.info_area.value = "no match for click " + repr((px, py))
-        self.info_area.value = "clicked %s: %s %s"  % (chosen_index, chosen_xy, detail)
+        #self.info_area.value = "clicked %s: %s %s"  % (chosen_index, chosen_xy, detail)
         self.selected_index = chosen_index
         self.highlight_detail(detail)
 
@@ -270,9 +353,10 @@ class SpotAnnotator(object):
         self.labels[index] = label
         color = COLORS[label]
         self.spot_display.change(name, fill=color)
-        self.info_area.value = "selected %s for %s" % (color, index)
+        xy = map(int, self.coordinates[index])
+        self.info_area.value = "selected %s for %s at %s." % (label, index, xy)
         return label
-        print "set_label", index, name, label, color
+        #print "set_label", index, name, label, color
 
     def adjust(self, x, y):
         (minx, miny) = self.mins
@@ -297,23 +381,49 @@ class SpotAnnotator(object):
     def label_selector(self):
         w = js_proxy.ProxyWidget()
         return w
+
+    def key_binding_callback(self, info, args):
+        arg = args["0"]
+        #print "key binding callback", arg
+        if arg in LABELS:
+            later(self.label_handler, [arg])
+        elif arg in ARROWS:
+            #print "later moving", arg
+            #later(self.move_spot, [arg])
+            self.move_spot(arg)
+
+    def move_spot(self, direction):
+        #print "moving spot", direction, self.last_xy
+        if self.last_xy is not None:
+            info = {"point": self.last_xy}
+            self.spot_callback(info, direction)
+
+    def add_key_bindings(self):
+        w = self.label_selection
+        cb = w.callback(self.key_binding_callback, None)
+        #w(w.element()["top_div"].keypress(cb))
+        #w.flush()
+        add_key_bindings_to_parent(w, self.key_binding_callback)
     
     def configure_label_selector(self):
         w = self.label_selection
         elt = w.element()
         jQuery = w.window().jQuery
-        w(elt._set("top_div", jQuery("<div/>").width("100px").html("LABELS")))
+        w(elt._set("top_div", jQuery("<div/>").width("100px").html("LABELS").attr('tabindex', 0).focus()))
         w(elt.append(elt.top_div))
+        ch_ord = LABEL_KEY_0
         for label in LABELS:
             callback = w.callback(self.label_handler, data=label)
             clr = COLORS[label]
+            ch = chr(ch_ord)
             w(elt._set(label,
                 jQuery("<div/>")
-                .html(label)
+                .html("&nbsp;"+ ch + ":" + label)
                 .click(callback)
                 .css('cursor', 'pointer')
                 .css('color', clr)
                 .appendTo(elt.top_div)))
+            ch_ord += 1
         return w
 
     detail_size = 500
@@ -383,7 +493,7 @@ class SpotAnnotator(object):
         #print "corner", corner, "dimensions", dimensions
         return (corner, dimensions)
 
-    def label_handler(self, label, args):
+    def label_handler(self, label, args=None):
         #print "label handler got", label
         w = self.label_selection
         elt = w.element()
@@ -476,3 +586,8 @@ class SpotAnnotator(object):
                 self.labels[index] = label
             line = f.readline().strip()
         return True  # success
+
+
+def later(operation, args=()):
+    t = Timer(0.1, operation, args)
+    t.start()
