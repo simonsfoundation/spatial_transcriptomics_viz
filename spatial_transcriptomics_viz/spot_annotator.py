@@ -29,6 +29,8 @@ Cent_Can = 'Cent_Can'
 Lat_Edge = 'Lat_Edge'
 Undefined = 'Undefined'
 
+NEARBY = "NEARBY"
+
 LABELS = sorted([
     Vent_Med_White,
     Vent_Horn,
@@ -45,6 +47,7 @@ LABELS = sorted([
     Undefined,
 ])
 
+# old colors
 COLORS = {
     Vent_Med_White: '#aaaa66',
     Vent_Horn: '#ee45ba',
@@ -61,6 +64,24 @@ COLORS = {
     Undefined: '#dddddd',
 }
 
+# new colors
+COLORS = {
+    Vent_Med_White: '#66aaaa',
+    Vent_Horn: '#ffaa00',
+    Vent_Lat_White: '#99aaaa',
+    Med_Grey: '#ff00aa',
+    Dors_Horn: '#99aa00',
+    Dors_Edge: '#66aa00',
+    Med_Lat_White: '#ffaaaa',
+    Vent_Edge: '#ff0000',
+    Med_Edge: '#990000',
+    Dors_Med_White: '#9900aa',
+    Cent_Can: '#6600aa',
+    Lat_Edge: '#660000',
+    Undefined: '#dddddd',
+}
+
+
 ARROWS = [LEFT, UP, RIGHT, DOWN] = "LEFT UP RIGHT DOWN".split()
 
 NAME_TO_ARROW_KEY_NUMBER = {
@@ -73,6 +94,7 @@ NAME_TO_KEY_NUMBER = {}
 LABEL_KEY_0 = ord('a')
 for (index, label) in enumerate(LABELS):
     NAME_TO_KEY_NUMBER[label] = LABEL_KEY_0 + index
+NAME_TO_KEY_NUMBER[NEARBY] = ord('x')
 
 KEY_HANDLER_TEMPLATE = """function(event) {
         switch (event.which) {
@@ -198,11 +220,14 @@ class SpotAnnotator(object):
         savebutton.on_click(self.save_click)
         restorebutton = self.restore_button = widgets.Button(description="restore")
         restorebutton.on_click(self.restore_click)
+        nearbybutton = self.nearby_button = widgets.Button(description="x: nearby")
+        nearbybutton.on_click(self.nearby_click)
         file_save_widgets = [filename, savebutton, restorebutton]
         if self.spots_href is not None:
             spots_checkbox = self.spots_checkbox = widgets.Checkbox(description="spots")
             file_save_widgets.append(spots_checkbox)
             spots_checkbox.on_trait_change(self.redraw, "value")
+        file_save_widgets.append(nearbybutton)
         file_save = widgets.HBox(children=file_save_widgets)
         work_area = widgets.HBox(children=[sd.target, ls, im_detail])
         self.assembly = widgets.VBox(children=[work_area, file_save, info])
@@ -241,6 +266,32 @@ class SpotAnnotator(object):
         self.dump_annotations(filename)
         self.info_area.value = "saved to " + filename
 
+    def nearby_click(self, *args):
+        changed = []
+        last_xy = self.last_xy
+        if last_xy is None:
+            self.info_area.value = "No position selected: cannot find nearby spots."
+            return
+        (last_x, last_y) = last_xy
+        label = self.selected_label
+        if label is None:
+            self.info_area.value = "No label selected: cannot label nearby spots."
+            return
+        selected_index = self.selected_index
+        radius = self.radius * 4
+        coords = self.coordinates
+        for (index, (x, y)) in enumerate(coords):
+            (x,y) = self.adjust(x,y)
+            distance = max(abs(x - last_x), abs(y-last_y))
+            if distance <= radius and index != selected_index:
+                self.set_label(index)
+                changed.append(index)
+        if len(changed) == 0:
+            self.info_area.value = "No spots found in radius " + repr(radius)
+        else:
+            self.spot_display.flush()
+            self.info_area.value = "Set %s to %s within radius %s." % (changed, label, radius)
+
     def circle_name(self, index):
         return "circle_" + str(index)
 
@@ -272,7 +323,7 @@ class SpotAnnotator(object):
             self.img_wh = add_image(drawing.target, self.image_href, opacity=0.5)
         if self.spots_href is not None and self.spots_checkbox.value:
             add_image(drawing.target, self.spots_href, opacity=0.5)
-        drawing.enable_events("click", self.spot_callback)
+        drawing.enable_events("click mousemove", self.spot_callback)
         self.info_area.value = "spots drawn " + repr(len(coords))
         #print "drew", len(coords), "spots"
         drawing.flush()
@@ -281,6 +332,8 @@ class SpotAnnotator(object):
 
     def spot_callback(self, info, direction=None, epsilon=0.2):
         [px, py] = info["point"]
+        ty = info.get("type")
+        #self.info_area.value = repr((px, py, ty))
         display = self.spot_display
         display.delete("click_circle")
         atts = {"opacity": 0.1}
@@ -314,6 +367,13 @@ class SpotAnnotator(object):
                 chosen_index = index
                 chosen_xy = (x, y)
                 #print "chose", index, (x,y), (px, py), (last_x, last_y), repr(direction)
+        if ty == "mousemove":
+            if chosen_index is None:
+                self.info_area.value = "No match at " + repr((x,y))
+            else:
+                label = self.labels[chosen_index]
+                self.info_area.value = "%s: %s at %s" % (chosen_index, label, chosen_xy)
+            return
         label = None
         if chosen_index is not None:
             label = self.set_label(chosen_index)
@@ -391,6 +451,10 @@ class SpotAnnotator(object):
             #print "later moving", arg
             #later(self.move_spot, [arg])
             self.move_spot(arg)
+        elif arg == NEARBY:
+            self.nearby_click()
+        else:
+            self.info_area.value = "UNKNOWN KEY: " + repr(args)
 
     def move_spot(self, direction):
         #print "moving spot", direction, self.last_xy
