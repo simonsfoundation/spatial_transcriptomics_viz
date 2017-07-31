@@ -23,6 +23,7 @@ Dors_Horn = 'Dors_Horn'
 Dors_Edge = 'Dors_Edge'
 Med_Lat_White = 'Med_Lat_White'
 Vent_Edge = 'Vent_Edge'
+Pulp = "Pulp"
 Med_Edge = 'Med_Edge'
 Dors_Med_White = 'Dors_Med_White'
 Cent_Can = 'Cent_Can'
@@ -40,6 +41,7 @@ LABELS = sorted([
     Dors_Edge,
     Med_Lat_White,
     Vent_Edge,
+    Pulp,
     Med_Edge,
     Dors_Med_White,
     Cent_Can,
@@ -47,22 +49,6 @@ LABELS = sorted([
     Undefined,
 ])
 
-# old colors
-COLORS = {
-    Vent_Med_White: '#aaaa66',
-    Vent_Horn: '#ee45ba',
-    Vent_Lat_White: '#66aaaa',
-    Med_Grey: '#997744',
-    Dors_Horn: '#447799',
-    Dors_Edge: '#774499',
-    Med_Lat_White: '#aa66aa',
-    Vent_Edge: '#994477',
-    Med_Edge: '#997744',
-    Dors_Med_White: '#aaddee',
-    Cent_Can: '#6666ff',
-    Lat_Edge: '#ff6666',
-    Undefined: '#dddddd',
-}
 
 # new colors
 COLORS = {
@@ -74,6 +60,7 @@ COLORS = {
     Dors_Edge: '#66aa00',
     Med_Lat_White: '#ffaaaa',
     Vent_Edge: '#ff0000',
+    Pulp: "#4a4bcc",
     Med_Edge: '#990000',
     Dors_Med_White: '#9900aa',
     Cent_Can: '#6600aa',
