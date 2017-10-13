@@ -1,4 +1,4 @@
-# spacial_transcriptomics_viz - visualization aids for spacial transcriptomics
+# spatial_transcriptomics_viz - visualization aids for spatial transcriptomics
 
 ## Setup instructions
 
