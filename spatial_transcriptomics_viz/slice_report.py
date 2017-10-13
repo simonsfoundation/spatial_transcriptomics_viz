@@ -150,11 +150,11 @@ def viz_expression_on_tissue_sections_data(viz_data,log_scale=True):
 
   # input thingies for user
   textinput_gene = bokeh.models.widgets.TextInput(value='Gfap',title='Gene:')
-  checkbox_genotype = bokeh.models.widgets.CheckboxButtonGroup(labels=['WT','G93a'],name='Genotype:',active=[0,1])
-  checkbox_timepoint = bokeh.models.widgets.CheckboxButtonGroup(labels=['p30','p70','p100','p120'],name='Timepoint:',active=[2,3])
+  #checkbox_genotype = bokeh.models.widgets.CheckboxButtonGroup(labels=['WT','G93a'],name='Genotype:',active=[0,1])
+  #checkbox_timepoint = bokeh.models.widgets.CheckboxButtonGroup(labels=['p30','p70','p100','p120'],name='Timepoint:',active=[2,3])
   plots.append([textinput_gene])
-  plots.append([checkbox_genotype])
-  plots.append([checkbox_timepoint])
+  #plots.append([checkbox_genotype])
+  #plots.append([checkbox_timepoint])
 
   # loop over result files
   for condition_data in viz_data:
@@ -298,7 +298,10 @@ def get_cell_types_on_tissue_sections_data(cell_type,conditions,proportions_file
 
     viz_data.append([])
 
+    print condition
+
     for count_file_idx in genotypes[condition[0]][condition[1]]:
+      print count_file_idx
       tmp = metadata[metadata['Count file'] == count_files[count_file_idx].replace('Count_Tables/','')]
       gt,tp,sex = tmp['Genotype'].values[0],tmp['Timepoint'].values[0],tmp['Sex'].values[0]
       gt = gt[0:5]+(gt[5:] and '..')
@@ -348,13 +351,13 @@ def viz_cell_types_on_tissue_sections_data(viz_data):
 
   # input thingies for user
   select_celltype = bokeh.models.widgets.Select(title='Cell type:', value='Cell type #1', options=['Cell type #%d'%(idx) for idx in range(1,11)])
-  checkbox_genotype = bokeh.models.widgets.CheckboxButtonGroup(labels=['WT','G93a'],name='Genotype:',active=[0,1])
-  checkbox_timepoint = bokeh.models.widgets.CheckboxButtonGroup(labels=['p30','p70','p100','p120'],name='Timepoint:',active=[2,3])
+  #checkbox_genotype = bokeh.models.widgets.CheckboxButtonGroup(labels=['WT','G93a'],name='Genotype:',active=[0,1])
+  #checkbox_timepoint = bokeh.models.widgets.CheckboxButtonGroup(labels=['p30','p70','p100','p120'],name='Timepoint:',active=[2,3])
   plots.append([select_celltype])
-  plots.append([checkbox_genotype])
-  plots.append([checkbox_timepoint])
+  #plots.append([checkbox_genotype])
+  #plots.append([checkbox_timepoint])
   
-  for condition in conditions:
+  for condition_data in viz_data:
     subplots = []
     for array_data in condition_data:
       # initialize a bokeh figure
@@ -494,7 +497,12 @@ if __name__ == '__main__':
   tab_list = []
 
   if options.expression_on_tissues:
-    conditions = [['WT','p100']]
+    conditions = []
+    for genotype in ['WT','G93A']:
+      for timepoint in ['p030','p070','p100','p120']:
+        conditions.append([genotype,timepoint])
+    #conditions = [['WT','p100']]
+    #conditions = [['WT','p100']]
     gene = 'Gfap'
   
     viz_data = get_expression_on_tissue_sections_data(gene,conditions)
@@ -512,7 +520,11 @@ if __name__ == '__main__':
   
   if options.cell_types_on_tissues:
     cell_type = 'Cell type #10' 
-    conditions = [['G93A','p100']]
+    conditions = []
+    for genotype in ['WT','G93A']:
+      for timepoint in ['p30','p70','p100','p120']:
+        conditions.append([genotype,timepoint])
+    #conditions = [['G93A','p100']]
   
     viz_data = get_cell_types_on_tissue_sections_data(cell_type,conditions)
     plots = viz_cell_types_on_tissue_sections_data(viz_data)
