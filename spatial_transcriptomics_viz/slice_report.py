@@ -12,6 +12,8 @@ import bokeh.io
 import bokeh.layouts
 import bokeh.models
 
+import argparse
+
 import colorcet
 
 from PIL import Image
@@ -413,7 +415,7 @@ def get_cell_types_in_anatomical_sections_data(anatomical_section,cell_types,tim
   # let parse our dataframe
   data = parse_P(P_df,count_files,metadata)
 
-  viz_data = {'cell_types': list(P_df.index),'covariates': covariates, 'genotypes': genotypes, 'timepoints': timepoints, 'data': []}
+  viz_data = {'anatomical_section': anatomical_section,'cell_types': list(P_df.index),'covariates': covariates, 'genotypes': genotypes, 'timepoints': timepoints, 'data': []}
 
   for timepoint in timepoints:
     data_x_gt1 = data[(data['Genotype'] == genotypes[0]) & (data['Time point'] == timepoint) & (data['Category'] == anatomical_section)][cell_types[0]]
@@ -432,9 +434,9 @@ def get_cell_types_in_anatomical_sections_data(anatomical_section,cell_types,tim
 def viz_cell_types_in_anatomical_sections_data(viz_data):
   plots = []
 
-  select_as = bokeh.models.widgets.Select(title='Anatomical section:',value='Vent_Horn', options=viz_data['covariates'])
-  select_ct_1 = bokeh.models.widgets.Select(title='First cell type:',value='Cell type #1', options=viz_data['cell_types'])
-  select_ct_2 = bokeh.models.widgets.Select(title='Second cell type:',value='Cell type #2', options=viz_data['cell_types'])
+  select_as = bokeh.models.widgets.Select(title='Anatomical section:',value=viz_data['anatomical_section'], options=viz_data['covariates'])
+  select_ct_1 = bokeh.models.widgets.Select(title='First cell type:',value=viz_data['cell_types'][0], options=viz_data['cell_types'])
+  select_ct_2 = bokeh.models.widgets.Select(title='Second cell type:',value=viz_data['cell_types'][1], options=viz_data['cell_types'])
 
   plots.append([select_as,select_ct_1,select_ct_2])
   
@@ -472,62 +474,70 @@ def viz_cell_types_in_anatomical_sections_data(viz_data):
   return plots
 
 if __name__ == '__main__':
+  parser = argparse.ArgumentParser(description='Slice report (by default all the tabs are drawn)')
+  parser.add_argument('-a','--expression_on_tissues',action='store_true',dest='expression_on_tissues',help='Draw the expression on tissue sections tab')
+  parser.add_argument('-b','--expression_coefficients',action='store_true',dest='expression_coefficients',help='Draw the expression coefficients tab')
+  parser.add_argument('-c','--cell_types_on_tissues',action='store_true',dest='cell_types_on_tissues',help='Draw the cell types on tissue sections tab')
+  parser.add_argument('-d','--cell_type_signatures',action='store_true',dest='cell_type_signatures',help='Draw the cell type signatures tab')
+  parser.add_argument('-e','--cell_types_in_anatomical_sections',action='store_true',dest='cell_types_in_anatomical_sections',help='Draw the cell types in anatomical sections tab')
+  parser.add_argument('-v','--version',action='version',version='%(prog)s 0.666')
+  options = parser.parse_args()
 
-  # "Expression on tissue sections" tab
+  # by default all the tabs are drawn
+  if not options.expression_on_tissues and not options.expression_coefficients and not options.cell_types_on_tissues and not options.cell_type_signatures and not options.cell_types_in_anatomical_sections:
+    options.cell_types_on_tissues = True
+    options.expression_coefficients = True
+    options.cell_types_on_tissues = True
+    options.cell_type_signatures = True
+    options.cell_types_in_anatomical_sections = True
+
+  tab_list = []
+
+  if options.expression_on_tissues:
+    conditions = [['WT','p100']]
+    gene = 'Gfap'
   
-  # THESE ARE THE VARIABLES USER CAN CHANGE
-  #conditions = [['G93A','p100'],['G93A','p120'],['WT','p100'],['WT','p120']]
-  conditions = [['WT','p100']]
-  gene = 'Gfap'
+    viz_data = get_expression_on_tissue_sections_data(gene,conditions)
+    plots = viz_expression_on_tissue_sections_data(viz_data)
+    p = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    tab_list.append(bokeh.models.widgets.Panel(child=p,title='Expression on tissue sections'))
   
-  viz_data = get_expression_on_tissue_sections_data(gene,conditions)
-  plots = viz_expression_on_tissue_sections_data(viz_data)
-  p = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+  if options.expression_coefficients:
+    gene = 'Gfap'
   
-  # "Expression coefficients" tab
+    viz_data = get_expression_coefficients_data()
+    plots = viz_expression_coefficients_data(viz_data,gene)
+    p2 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    tab_list.append(bokeh.models.widgets.Panel(child=p2,title='Expression coefficients'))
   
-  # THESE ARE THE VARIABLES USER CAN CHANGE
-  gene = 'Gfap'
+  if options.cell_types_on_tissues:
+    cell_type = 'Cell type #10' 
+    conditions = [['G93A','p100']]
   
-  viz_data = get_expression_coefficients_data()
-  plots = viz_expression_coefficients_data(viz_data,gene)
-  p2 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    viz_data = get_cell_types_on_tissue_sections_data(cell_type,conditions)
+    plots = viz_cell_types_on_tissue_sections_data(viz_data)
+    p3 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    tab_list.append(bokeh.models.widgets.Panel(child=p3,title='Cell types on tissue sections'))
   
-  # "Cell types on tissue sections" tab
+  if options.cell_type_signatures:
+    viz_data = get_cell_type_signatures_data()
+    data_table = viz_cell_type_signatures_data(viz_data)
+    p4 = bokeh.layouts.widgetbox(data_table)
+    tab_list.append(bokeh.models.widgets.Panel(child=p4,title='Cell type signatures'))
   
-  # THESE ARE THE VARIABLES USER CAN CHANGE
-  cell_type = 'Cell type #10' 
-  #conditions = [['G93A','p100'],['G93A','p120'],['WT','p100'],['WT','p120']]
-  conditions = [['G93A','p100']]
+  if options.cell_types_in_anatomical_sections:
+    anatomical_section = 'Vent_Horn'
+    cell_types = ['Cell type #5', 'Cell type #9']
+    genotypes = ['WT','G93A']
+    timepoints = ['p30','p70','p100','p120']
   
-  viz_data = get_cell_types_on_tissue_sections_data(cell_type,conditions)
-  plots = viz_cell_types_on_tissue_sections_data(viz_data)
-  p3 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    viz_data = get_cell_types_in_anatomical_sections_data(anatomical_section,cell_types,timepoints,genotypes)
+    plots = viz_cell_types_in_anatomical_sections_data(viz_data)
+    p5 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
+    tab_list.append(bokeh.models.widgets.Panel(child=p5,title='Cell types in anatomical sections'))
   
-  # "Cell type signatures" tab
-  viz_data = get_cell_type_signatures_data()
-  data_table = viz_cell_type_signatures_data(viz_data)
-  p4 = bokeh.layouts.widgetbox(data_table)
-  
-  # "Cell types in anatomical sections" tab
-  
-  # THESE ARE THE VARIABLES USER CAN CHANGE
-  anatomical_section = 'Vent_Horn'
-  cell_types = ['Cell type #5', 'Cell type #9']
-  genotypes = ['WT','G93A']
-  timepoints = ['p30','p70','p100','p120']
-  
-  viz_data = get_cell_types_in_anatomical_sections_data(anatomical_section,cell_types,timepoints,genotypes)
-  plots = viz_cell_types_in_anatomical_sections_data(viz_data)
-  p5 = bokeh.layouts.gridplot(plots,merge_tools=True,toolbar_location='left')
-  
-  # we have selectable tabs
-  tab1 = bokeh.models.widgets.Panel(child=p, title="Expression on tissue sections")
-  tab2 = bokeh.models.widgets.Panel(child=p2, title="Expression coefficients")
-  tab3 = bokeh.models.widgets.Panel(child=p3, title="Cell types on tissue sections")
-  tab4 = bokeh.models.widgets.Panel(child=p4, title="Cell type signatures")
-  tab5 = bokeh.models.widgets.Panel(child=p5, title="Cell types in anatomical sections")
-  tabs = bokeh.models.widgets.Tabs(tabs=[tab1,tab2,tab3,tab4,tab5])
+  # create our tab pane object from our tabs
+  tabs = bokeh.models.widgets.Tabs(tabs=tab_list)
   
   # finally, let us display our tab pane object
   bokeh.plotting.show(tabs)
