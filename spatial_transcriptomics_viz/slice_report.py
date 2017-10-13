@@ -298,10 +298,7 @@ def get_cell_types_on_tissue_sections_data(cell_type,conditions,proportions_file
 
     viz_data.append([])
 
-    print condition
-
     for count_file_idx in genotypes[condition[0]][condition[1]]:
-      print count_file_idx
       tmp = metadata[metadata['Count file'] == count_files[count_file_idx].replace('Count_Tables/','')]
       gt,tp,sex = tmp['Genotype'].values[0],tmp['Timepoint'].values[0],tmp['Sex'].values[0]
       gt = gt[0:5]+(gt[5:] and '..')
