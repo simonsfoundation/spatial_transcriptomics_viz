@@ -21,10 +21,20 @@ from PIL import Image
 COVARIATES = {'Vent_Med_White': 'Ventral medial white','Vent_Horn': 'Ventral horn','Vent_Lat_White': 'Ventral lateral white','Med_Grey': 'Medial grey','Dors_Horn': 'Dorsal horn','Dors_Edge': 'Dorsal edge','Med_Lat_White': 'Medial lateral white','Vent_Edge': 'Ventral Edge','Dors_Med_White': 'Dorsal medial white','Cent_Can': 'Central canal','Lat_Edge': 'Lateral edge'}
 
 class ExpressionOnTissueSections:
-  def __init__(self,gene,conditions,metadata_filename='../data/Metadata/metadata_09252017.tsv'):
+  def __init__(self,gene,conditions,metadata_filename='../data/Metadata/metadata_09252017.tsv',log_scale=True):
     self.genes,self.data = self.__read_data(conditions,metadata_filename)
     self.source_spots,self.vmin,self.vmax = self.__create_source_spots(gene)
     self.source_image = self.__create_source_image()
+
+    # initialize the colormapper and ticker
+    if log_scale:
+      self.color_mapper = bokeh.models.mappers.LogColorMapper('Viridis256',low=self.vmin,high=self.vmax)
+      self.ticker = bokeh.models.LogTicker(base=2)
+    else:
+      self.color_mapper = bokeh.models.mappers.LinearColorMapper('Viridis256',low=self.vmin,high=self.vmax)
+      self.ticker = bokeh.models.BasicTicker(base=2,mantissas=[1,5])
+
+  self.error_pretext = bokeh.models.widgets.PreText(text='',width=100,height=20)
 
   def __read_data(self,conditions,metadata_filename):
     # names of the results files of the given conditions
@@ -131,36 +141,30 @@ class ExpressionOnTissueSections:
     return source_image
 
   def __update_plot(self,attr,old,new):
-    print old,new
-    if new not in self.data.keys():
-      # TODO: let the user know that the gene was not found
-      print 'gene not found!'
+    if new not in self.genes:
+      self.error_pretext.text = 'gene not found!'
       return
+    self.error_pretext.text = ''
+
     source_spots,vmin,vmax = self.__create_source_spots(new)
 
-    # TODO: update the colorbar
     for n in range(0,len(source_spots)):
       for m in range(0,len(source_spots[n])):
         self.source_spots[n][m].data = source_spots[n][m].data
 
+    self.color_mapper.low = vmin
+    self.color_mapper.high = vmax
+
     self.vmax_value = vmax
     self.vmin_value = vmin
   
-  def plot(self,gene='Gfap',log_scale=True):
-    # initialize the colormapper and ticker
-    if log_scale:
-      color_mapper = bokeh.models.mappers.LogColorMapper('Viridis256',low=self.vmin,high=self.vmax)
-      ticker = bokeh.models.LogTicker(base=2)
-    else:
-      color_mapper = bokeh.models.mappers.LinearColorMapper('Viridis256',low=self.vmin,high=self.vmax)
-      ticker = bokeh.models.BasicTicker(base=2,mantissas=[1,5])
-   
+  def plot(self,gene='Gfap'):
     plots = []
   
     # input thingies for user
     textinput_gene = bokeh.models.widgets.TextInput(value='Gfap',title='Gene:')
     textinput_gene.on_change('value',self.__update_plot)
-    plots.append([textinput_gene])
+    plots.append([textinput_gene,self.error_pretext])
   
     # loop over result files
     for n,condition_data in enumerate(self.data,start=0):
@@ -182,7 +186,7 @@ class ExpressionOnTissueSections:
         s.image_url(url='image',x=0,y=0,anchor='bottom_left',w=array_data['dims'][0],h=array_data['dims'][1],source=self.source_image[n][m])
     
         # plot the spots
-        s.scatter(x='x',y='y',radius=5,fill_color={'field': 'z','transform': color_mapper},fill_alpha=0.8,line_color=None,source=self.source_spots[n][m])
+        s.scatter(x='x',y='y',radius=5,fill_color={'field': 'z','transform': self.color_mapper},fill_alpha=0.8,line_color=None,source=self.source_spots[n][m])
   
         subplots.append(s)
 
@@ -190,7 +194,7 @@ class ExpressionOnTissueSections:
     
     # initialize an empty bokeh figure for colorbar
     s = bokeh.plotting.figure(width=250,plot_height=100,title=None,x_axis_location=None,y_axis_location=None,tools='pan,wheel_zoom,reset',min_border=0,outline_line_color=None)
-    color_bar = bokeh.models.ColorBar(color_mapper=color_mapper,ticker=ticker,label_standoff=6,border_line_color=None,location=(0,0),major_tick_line_color='black',title='Expression',orientation='horizontal')
+    color_bar = bokeh.models.ColorBar(color_mapper=self.color_mapper,ticker=self.ticker,label_standoff=6,border_line_color=None,location=(0,0),major_tick_line_color='black',title='Expression',orientation='horizontal')
     s.add_layout(color_bar,'above')
     s.toolbar.logo = None
     s.toolbar_location = None
@@ -205,6 +209,8 @@ class ExpressionCoefficients:
     self.source,self.max_value = self.__create_source(gene)
 
     self.gene = gene
+
+    self.error_pretext = bokeh.models.widgets.PreText(text='',width=100,height=20)
 
   def __joy(self,category,data,scale=0.2):
     return list(zip([category]*len(data), scale*data))
@@ -242,11 +248,11 @@ class ExpressionCoefficients:
     return source,max_value
 
   def __update_plot(self,attr,old,new):
-    print old,new
     if new not in self.data.keys():
-      # TODO: let the user know that the gene was not found
-      print 'gene not found!'
+      self.error_pretext.text = 'gene not found!'
       return
+    self.error_pretext.text = ''
+
     source,max_value = self.__create_source(new)
 
     # TODO: update the y-axis range
@@ -263,7 +269,7 @@ class ExpressionCoefficients:
     # an input thingie for user
     textinput_gene = bokeh.models.widgets.TextInput(value=self.gene,title='Gene:')
     textinput_gene.on_change('value',self.__update_plot)
-    plots.append([textinput_gene])
+    plots.append([textinput_gene,self.error_pretext])
 
     # loop over tissue categories
     for idx,covariate in enumerate(self.covariates,start=0):
@@ -313,6 +319,10 @@ class CellTypesOnTissueSections:
     self.cell_types,self.data = self.__read_data(conditions,proportions_filename,metadata_filename)
     self.source_spots,self.vmax = self.__create_source_spots(cell_type)
     self.source_image = self.__create_source_image()
+
+    # initialize the colormapper and ticker
+    color_mapper = bokeh.models.mappers.LinearColorMapper('Plasma256',low=0,high=self.vmax)
+    ticker = bokeh.models.BasicTicker(base=2,mantissas=[1,5])
 
   def __read_data(self,conditions,proportions_filename,metadata_filename):
     # read the data
@@ -417,18 +427,15 @@ class CellTypesOnTissueSections:
   def __update_plot(self,attr,old,new):
     source_spots,vmax = self.__create_source_spots(new)
 
-    # TODO: update the colorbar
     for n in range(0,len(source_spots)):
       for m in range(0,len(source_spots[n])):
         self.source_spots[n][m].data = source_spots[n][m].data
 
+    self.color_mapper.high = vmax 
+
     self.vmax_value = vmax
 
   def plot(self,cell_type):
-    # initialize the colormapper and ticker
-    color_mapper = bokeh.models.mappers.LinearColorMapper('Plasma256',low=0,high=self.vmax)
-    ticker = bokeh.models.BasicTicker(base=2,mantissas=[1,5])
-   
     plots = []
   
     # input thingies for user
@@ -456,7 +463,7 @@ class CellTypesOnTissueSections:
         s.image_url(url='image',x=0,y=0,anchor='bottom_left',w=array_data['dims'][0],h=array_data['dims'][1],source=self.source_image[n][m])
     
         # plot the spots
-        s.scatter(x='x',y='y',radius=5,fill_color={'field': 'z','transform': color_mapper},fill_alpha=0.8,line_color=None,source=self.source_spots[n][m])
+        s.scatter(x='x',y='y',radius=5,fill_color={'field': 'z','transform': self.color_mapper},fill_alpha=0.8,line_color=None,source=self.source_spots[n][m])
   
         subplots.append(s)
 
@@ -464,7 +471,7 @@ class CellTypesOnTissueSections:
     
     # initialize an empty bokeh figure for colorbar
     s = bokeh.plotting.figure(width=250,plot_height=100,title=None,x_axis_location=None,y_axis_location=None,tools='pan,wheel_zoom,reset',min_border=0,outline_line_color=None)
-    color_bar = bokeh.models.ColorBar(color_mapper=color_mapper,ticker=ticker,label_standoff=6,border_line_color=None,location=(0,0),major_tick_line_color='black',title='Expression',orientation='horizontal')
+    color_bar = bokeh.models.ColorBar(color_mapper=self.color_mapper,ticker=self.ticker,label_standoff=6,border_line_color=None,location=(0,0),major_tick_line_color='black',title='Expression',orientation='horizontal')
     s.add_layout(color_bar,'above')
     s.toolbar.logo = None
     s.toolbar_location = None
@@ -560,7 +567,6 @@ class CellTypesinAnatomicalSections:
   def __update_plot(self,attr,old,new):
     source = self.__create_source(self.select_as.value,[self.select_ct_1.value,self.select_ct_2.value])
 
-    # TODO: update axis labels
     for timepoint in self.timepoints:
       for genotype in self.genotypes:
         self.source[timepoint][genotype].data = source[timepoint][genotype].data
@@ -578,7 +584,7 @@ class CellTypesinAnatomicalSections:
     subplots = []
     for timepoint in self.timepoints:
       # initialize a bokeh figure
-      s = bokeh.plotting.figure(width=235,plot_height=250,title=timepoint,x_range=(0,1),y_range=(0,1),x_axis_label=cell_types[0],y_axis_label=cell_types[1],match_aspect=True,aspect_scale=1,tools=[bokeh.models.tools.PanTool(),bokeh.models.tools.WheelZoomTool(),bokeh.models.tools.ResetTool()])
+      s = bokeh.plotting.figure(width=235,plot_height=250,title=timepoint,x_range=(0,1),y_range=(0,1),x_axis_label='First cell type',y_axis_label='Second cell type',match_aspect=True,aspect_scale=1,tools=[bokeh.models.tools.PanTool(),bokeh.models.tools.WheelZoomTool(),bokeh.models.tools.ResetTool()])
       s.toolbar.logo = None
       s.toolbar_location = None
     
