@@ -34,7 +34,7 @@ class ExpressionOnTissueSections:
       self.color_mapper = bokeh.models.mappers.LinearColorMapper('Viridis256',low=self.vmin,high=self.vmax)
       self.ticker = bokeh.models.BasicTicker(base=2,mantissas=[1,5])
 
-  self.error_pretext = bokeh.models.widgets.PreText(text='',width=100,height=20)
+    self.error_pretext = bokeh.models.widgets.PreText(text='',width=100,height=20)
 
   def __read_data(self,conditions,metadata_filename):
     # names of the results files of the given conditions
