@@ -190,7 +190,7 @@ class SpotAnnotator(object):
         self.image_size = np.array(im.size)
         self.mins = np.array(mins, dtype=np.float)
         if maxes is None:
-            spot_to_pixels = self.image_size[0] * 194.0 / 6200.0
+            spot_to_pixels = self.image_size[0] * 194 / 6200.0
             self.maxes = self.mins + (self.image_size / spot_to_pixels)
         else:
             self.maxes = np.array(maxes, dtype=np.float)
@@ -257,7 +257,7 @@ class SpotAnnotator(object):
             self.info_area.value = "failed to restore " + repr((filename, result))
 
     def redraw(self, *args):
-        t = Timer(0.1, self.draw_spots)
+        t = Timer(0.05, self.draw_spots)
         t.start()
 
     def save_click(self, *args):
@@ -543,7 +543,10 @@ class SpotAnnotator(object):
         #print "detail_image", sx, sy, sw, sh, dx, dy, dw, dh
         w(elt.ctx.drawImage(elt.detail_image[0], sx, sy, sw, sh, dx, dy, dw, dh))
         cx = cy = self.detail_side * 0.5
-        radius = self.radius * canvas_to_image[0]
+        if size >= 500:
+            radius = self.radius * canvas_to_image[0] / (size/500)
+        else:
+            radius = self.radius * canvas_to_image[0] / (500/size)
         w(elt.ctx.beginPath())
         w(elt.ctx.arc(cx, cy, radius, 0, 6.28))
         w(elt.ctx.stroke())
@@ -653,5 +656,5 @@ class SpotAnnotator(object):
 
 
 def later(operation, args=()):
-    t = Timer(0.1, operation, args)
+    t = Timer(0.05, operation, args)
     t.start()
